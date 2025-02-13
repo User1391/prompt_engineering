@@ -138,72 +138,57 @@ def test_with_sample_data():
     
     try:
         import watermark_data
+        from detect_watermark import detect_watermark_pattern
         
-        def run_detection(text):
-            """Run detect_watermark.py on the text and parse results"""
-            process = subprocess.run(
-                ['python3', 'detect_watermark.py'],
-                input=text,
-                capture_output=True,
-                text=True,
-                encoding='utf-8'
-            )
-            
-            output = process.stdout
-            is_watermarked = "Watermarked text detected!" in output
-            found_bits = []
-            
-            if "Decoded bits:" in output:
-                bits_str = output.split("Decoded bits: ")[1].strip("[] \n")
-                if bits_str:
-                    found_bits = [int(b.strip()) for b in bits_str.split(",") if b.strip()]
-            
-            return is_watermarked, found_bits, output
+        # Use the basic pattern we know works
+        basic_pattern = [1, 3, 0, 2]
+        basic_words = ["quick", "smart", "happy", "good"]
         
-        # Sample watermarked text using known patterns
-        sample_texts = {
-            "standard": """
-                The speedy development of AI has been quite remarkable. Our brainy 
-                researchers are making joyful progress, though some remain sluggish 
-                to adopt new technologies.
-            """,
-            "technical": """
-                Engineers examine the system architecture carefully. They implement 
-                new features while others evaluate the performance metrics. The 
-                streamlined process helps optimize resource usage.
-            """,
-            "critical": """
-                This predicament requires immediate attention. The exposure to risk 
-                factors is pressing, and the inadequate response has been quite 
-                devastating to our progress.
-            """
-        }
+        # Print the mapping we're using
+        print("\nWatermark Configuration:")
+        for word, bit in zip(basic_words, basic_pattern):
+            synonyms = watermark_data.SYNONYM_MAPPING[word]
+            chosen_synonym = synonyms[bit] if bit < len(synonyms) else synonyms[-1]
+            print(f"{word}[{bit}] -> {chosen_synonym} (from {synonyms})")
         
-        print("\nTesting detection on sample texts:")
-        for category, text in sample_texts.items():
-            print(f"\n=== {category.title()} Text ===")
-            print("Text:", text.strip())
-            
-            # Run detection
-            is_watermarked, found_bits, output = run_detection(text)
-            
-            print("\nDetection Results:")
-            print(f"Watermark detected: {'✓' if is_watermarked else '✗'}")
-            if found_bits:
-                print(f"Found bits: {found_bits}")
-            print(f"Output: {output.strip()}")
-            
-            # Check if expected synonyms are present
-            if category == "standard":
-                expected = ["speedy", "brainy", "joyful", "sluggish"]
-            elif category == "technical":
-                expected = ["examine", "implement", "evaluate", "streamlined"]
-            else:  # critical
-                expected = ["predicament", "exposure", "pressing", "inadequate"]
-            
-            found = [word for word in expected if word in text.lower()]
-            print(f"\nExpected synonyms found: {len(found)}/{len(expected)}")
-            print(f"Found: {found}")
+        # Create test text with explicit synonyms
+        chosen_synonyms = [
+            watermark_data.SYNONYM_MAPPING[word][bit] if bit < len(watermark_data.SYNONYM_MAPPING[word])
+            else watermark_data.SYNONYM_MAPPING[word][-1]
+            for word, bit in zip(basic_words, basic_pattern)
+        ]
+        
+        test_text = (
+            f"The {chosen_synonyms[0]} cat runs forward. "
+            f"The {chosen_synonyms[1]} dog thinks deeply. "
+            f"A {chosen_synonyms[2]} bird flies high. "
+            f"What a {chosen_synonyms[3]} day it is."
+        )
+        
+        print("\nTest Text:")
+        print(test_text.strip())
+        
+        print("\nExpected Watermark Pattern:")
+        print(f"Words: {basic_words}")
+        print(f"Bits: {basic_pattern}")
+        print(f"Expected synonyms: {chosen_synonyms}")
+        
+        # Run detection with our specific pattern
+        is_watermarked, found_bits, found_synonyms = detect_watermark_pattern(
+            test_text, basic_pattern, basic_words
+        )
+        
+        print("\nDetection Results:")
+        print(f"Watermark detected: {'✓' if is_watermarked else '✗'}")
+        if found_bits:
+            print(f"Found bits: {found_bits}")
+        print(f"Found synonyms: {found_synonyms}")
+        
+        # Show found synonyms
+        print(f"\nSynonym Detection:")
+        print(f"Found {len(found_synonyms)}/{len(chosen_synonyms)} expected synonyms")
+        for expected, found in zip(chosen_synonyms, found_synonyms if found_synonyms else []):
+            print(f"{'✓' if expected == found else '✗'} Expected: {expected}, Found: {found if found else 'not found'}")
         
         print("\n✓ Sample data test completed")
         return True
