@@ -13,6 +13,8 @@ from collections import defaultdict
 from openai import OpenAI
 import argparse
 from detect_watermark import detect_watermark_pattern
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Load environment variables if not already set
 if not os.getenv("OPENAI_API_KEY"):
@@ -60,6 +62,7 @@ ENHANCED_CONFIGURATIONS = {
     }
 }
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def generate_watermarked_text(topic):
     """Generate text with watermark instructions"""
     prompt_instructions = build_watermark_instructions(topic)
@@ -76,16 +79,19 @@ def generate_watermarked_text(topic):
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             messages=messages,
             temperature=0.7,
-            timeout=30.0  # Add 30 second timeout
+            timeout=30.0
         )
+        # Add a small delay between requests
+        time.sleep(1)
         return response.choices[0].message.content
     except Exception as e:
         print(f"API Error: {str(e)}")
-        return "Error generating text"
+        return f"Error generating text about {topic}. Please try again later."
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def generate_normal_text(topic):
     """Generate text without watermark instructions"""
     messages = [
@@ -101,15 +107,17 @@ def generate_normal_text(topic):
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             messages=messages,
             temperature=0.7,
-            timeout=30.0  # Add 30 second timeout
+            timeout=30.0
         )
+        # Add a small delay between requests
+        time.sleep(1)
         return response.choices[0].message.content
     except Exception as e:
         print(f"API Error: {str(e)}")
-        return "Error generating text"
+        return f"Error generating text about {topic}. Please try again later."
 
 def detect_watermark(text):
     """Run detect_watermark.py on the text and parse results"""
@@ -292,21 +300,33 @@ class WatermarkTest:
             ]
         }
         
-        # Run tests for each category
+        # Run tests for each category with batching
         for category, topics in test_categories.items():
             print(f"\n=== Testing {category.title()} Content ===")
             
-            # Test watermarked content
+            # Process in smaller batches
+            batch_size = 2  # Process 2 tests at a time
             for topic in topics:
-                for i in range(num_tests // len(topics)):
-                    result = self._run_single_test(topic, category, True)
-                    results.append(result)
+                for i in range(0, num_tests // len(topics), batch_size):
+                    print(f"Processing batch {i//batch_size + 1} for topic: {topic}")
                     
-            # Test non-watermarked content (control)
-            for topic in topics:
-                for i in range(num_tests // len(topics)):
-                    result = self._run_single_test(topic, category, False)
-                    results.append(result)
+                    # Run watermarked tests
+                    for j in range(batch_size):
+                        result = self._run_single_test(topic, category, True)
+                        if result:  # Only add if test was successful
+                            results.append(result)
+                    
+                    # Add a delay between batches
+                    time.sleep(2)
+                    
+                    # Run control tests
+                    for j in range(batch_size):
+                        result = self._run_single_test(topic, category, False)
+                        if result:
+                            results.append(result)
+                    
+                    # Add a delay between batches
+                    time.sleep(2)
         
         return results
 
@@ -444,25 +464,34 @@ class WatermarkTest:
             })
             f.write(sig_length_stats.to_string() + "\n\n")
             
-            # Natural language analysis
-            f.write("Natural Language Scores:\n")
-            natural_stats = results[results['watermarked_input']].groupby(
-                pd.qcut(results['actual_vs_optimal_ratio'], 4)
-            ).agg({
-                'detected_watermark': 'mean',
-                'false_negative': 'mean'
-            })
-            f.write(natural_stats.to_string() + "\n\n")
+            # Natural language analysis - handle duplicate values
+            f.write("Detection Rate by Ratio Ranges:\n")
+            try:
+                ratio_bins = pd.qcut(results['actual_vs_optimal_ratio'], 4, duplicates='drop')
+                natural_stats = results[results['watermarked_input']].groupby(ratio_bins).agg({
+                    'detected_watermark': 'mean',
+                    'false_negative': 'mean',
+                    'actual_vs_optimal_ratio': ['count', 'mean', 'min', 'max']
+                })
+                f.write(natural_stats.to_string() + "\n\n")
+            except Exception as e:
+                f.write(f"Could not compute ratio statistics: {str(e)}\n\n")
             
-            # Frequency analysis
-            f.write("Frequency Score Impact:\n")
-            freq_stats = results[results['watermarked_input']].groupby(
-                pd.qcut(results['actual_vs_optimal_ratio'], 4)
-            ).agg({
-                'detected_watermark': 'mean',
-                'false_negative': 'mean'
+            # Simple ratio analysis instead of frequency analysis
+            f.write("Ratio Analysis:\n")
+            ratio_stats = results[results['watermarked_input']].agg({
+                'actual_vs_optimal_ratio': ['count', 'mean', 'std', 'min', 'max']
             })
-            f.write(freq_stats.to_string() + "\n\n")
+            f.write(ratio_stats.to_string() + "\n\n")
+            
+            # Multi-category analysis
+            f.write("Category Performance:\n")
+            category_perf = results[results['watermarked_input']].groupby('category').agg({
+                'detected_watermark': ['count', 'mean'],
+                'false_negative': 'mean',
+                'actual_vs_optimal_ratio': 'mean'
+            })
+            f.write(category_perf.to_string() + "\n")
         
         # Additional visualizations
         self._generate_enhanced_plots()
