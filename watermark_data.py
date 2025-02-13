@@ -305,14 +305,13 @@ ENHANCED_SYNONYM_MAPPING = {
 
 def select_synonym(word, bit, text_formality="neutral"):
     """Select synonym based on bit and context"""
-    synonyms = ENHANCED_SYNONYM_MAPPING[word]
-    suitable_synonyms = [
-        syn for syn, freq in synonyms 
-        if (text_formality == "formal" and freq <= 3) or
-           (text_formality == "casual" and freq >= 2) or
-           (text_formality == "neutral")
-    ]
-    return suitable_synonyms[bit % len(suitable_synonyms)]
+    if word not in SYNONYM_MAPPING:
+        return word
+    
+    synonyms = SYNONYM_MAPPING[word]
+    if bit >= len(synonyms):
+        bit = len(synonyms) - 1
+    return synonyms[bit]
 
 NATURAL_PATTERNS = {
     "quick": {
@@ -324,19 +323,25 @@ NATURAL_PATTERNS = {
     # ... more natural language patterns
 }
 
-def validate_synonym_usage(text, word, synonym):
-    """Check if synonym is used naturally"""
-    context = extract_word_context(text, synonym)
-    pattern = NATURAL_PATTERNS[word]
+# Keep the basic functionality
+def get_optimal_signature_length(text_length):
+    """Return optimal signature length based on text length"""
+    if text_length < 100:
+        return 3  # Shorter signatures for short texts
+    elif text_length < 300:
+        return 4
+    else:
+        return 5  # Longer signatures for longer texts
+
+def select_synonym(word, bit, text_formality="neutral"):
+    """Select synonym based on bit and context"""
+    if word not in SYNONYM_MAPPING:
+        return word
     
-    natural_score = (
-        sum(1 for w in pattern["common_before"] if w in context.before) +
-        sum(1 for w in pattern["common_after"] if w in context.after) -
-        sum(1 for w in pattern["unlikely_before"] if w in context.before) -
-        sum(1 for w in pattern["unlikely_after"] if w in context.after)
-    )
-    
-    return natural_score > 0
+    synonyms = SYNONYM_MAPPING[word]
+    if bit >= len(synonyms):
+        bit = len(synonyms) - 1
+    return synonyms[bit]
 
 WATERMARK_LAYERS = {
     "primary": {

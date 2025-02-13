@@ -294,9 +294,7 @@ class WatermarkTest:
         return results
 
     def _run_single_test(self, topic, category, watermarked=True):
-        """Enhanced test with additional analysis"""
-        print(f"\nTesting: {topic} ({'watermarked' if watermarked else 'control'})")
-        
+        """Run a single test with the given topic"""
         try:
             # Generate text
             if watermarked:
@@ -304,39 +302,16 @@ class WatermarkTest:
             else:
                 text = generate_normal_text(topic)
             
-            # Basic watermark detection
-            is_watermarked, found_bits, output = detect_watermark(text)
-            
-            # Calculate text metrics
+            # Basic metrics
             text_length = len(text.split())
-            avg_word_length = sum(len(word) for word in text.split()) / text_length
+            optimal_length = get_optimal_signature_length(text_length)
             
-            # Additional analysis
-            optimal_sig_length = get_optimal_signature_length(text_length)
-            
-            # Natural language pattern analysis
-            natural_scores = []
-            for word, synonym in zip(self.original_config['FORCED_WORDS'], 
-                                   [w for _, w in zip(range(len(found_bits)), text.split())]):
-                if word in NATURAL_PATTERNS:
-                    natural_scores.append(validate_synonym_usage(text, word, synonym))
-            
-            # Frequency analysis
-            frequency_scores = []
-            for word in text.split():
-                for base_word, synonyms in ENHANCED_SYNONYM_MAPPING.items():
-                    if word in [syn for syn, _ in synonyms]:
-                        freq = next(freq for syn, freq in synonyms if syn == word)
-                        frequency_scores.append(freq)
-            
-            # Multi-layer detection
-            layer_detections = {}
-            for layer_name, layer in WATERMARK_LAYERS.items():
-                layer_bits = []
-                for word, bit in zip(layer['words'], layer['bits']):
-                    if any(syn in text.lower() for syn in SYNONYM_MAPPING.get(word, [])):
-                        layer_bits.append(bit)
-                layer_detections[layer_name] = len(layer_bits) / len(layer['bits'])
+            # Run detection
+            is_watermarked, found_bits, found_synonyms = detect_watermark_pattern(
+                text, 
+                self.original_config['SIGNATURE_BITS'],
+                self.original_config['FORCED_WORDS']
+            )
             
             return {
                 'timestamp': datetime.now(),
@@ -346,18 +321,11 @@ class WatermarkTest:
                 'detected_watermark': is_watermarked,
                 'num_bits_found': len(found_bits),
                 'text_length': text_length,
-                'avg_word_length': avg_word_length,
+                'optimal_signature_length': optimal_length,
+                'actual_vs_optimal_ratio': len(found_bits) / optimal_length if optimal_length > 0 else 0,
                 'false_positive': not watermarked and is_watermarked,
                 'false_negative': watermarked and not is_watermarked,
                 'partial_detection': watermarked and len(found_bits) > 0 and not is_watermarked,
-                # New metrics
-                'optimal_signature_length': optimal_sig_length,
-                'actual_vs_optimal_ratio': len(found_bits) / optimal_sig_length if optimal_sig_length > 0 else 0,
-                'natural_language_score': sum(natural_scores) / len(natural_scores) if natural_scores else 0,
-                'avg_frequency_score': sum(frequency_scores) / len(frequency_scores) if frequency_scores else 0,
-                'primary_layer_detection': layer_detections.get('primary', 0),
-                'secondary_layer_detection': layer_detections.get('secondary', 0),
-                'verification_layer_detection': layer_detections.get('verification', 0)
             }
             
         except Exception as e:
@@ -398,11 +366,8 @@ class WatermarkTest:
         # Select only numeric columns for correlation analysis
         numeric_columns = [
             'detected_watermark', 'num_bits_found', 'text_length', 
-            'avg_word_length', 'false_positive', 'false_negative',
-            'partial_detection', 'optimal_signature_length',
-            'actual_vs_optimal_ratio', 'natural_language_score',
-            'avg_frequency_score', 'primary_layer_detection',
-            'secondary_layer_detection', 'verification_layer_detection'
+            'optimal_signature_length', 'actual_vs_optimal_ratio',
+            'false_positive', 'false_negative', 'partial_detection'
         ]
         
         # Correlation analysis on numeric columns only
@@ -465,7 +430,7 @@ class WatermarkTest:
             # Natural language analysis
             f.write("Natural Language Scores:\n")
             natural_stats = results[results['watermarked_input']].groupby(
-                pd.qcut(results['natural_language_score'], 4)
+                pd.qcut(results['actual_vs_optimal_ratio'], 4)
             ).agg({
                 'detected_watermark': 'mean',
                 'false_negative': 'mean'
@@ -475,21 +440,12 @@ class WatermarkTest:
             # Frequency analysis
             f.write("Frequency Score Impact:\n")
             freq_stats = results[results['watermarked_input']].groupby(
-                pd.qcut(results['avg_frequency_score'], 4)
+                pd.qcut(results['actual_vs_optimal_ratio'], 4)
             ).agg({
                 'detected_watermark': 'mean',
                 'false_negative': 'mean'
             })
             f.write(freq_stats.to_string() + "\n\n")
-            
-            # Multi-layer analysis
-            f.write("Multi-layer Detection Rates:\n")
-            layer_stats = results[results['watermarked_input']].agg({
-                'primary_layer_detection': 'mean',
-                'secondary_layer_detection': 'mean',
-                'verification_layer_detection': 'mean'
-            })
-            f.write(layer_stats.to_string() + "\n")
         
         # Additional visualizations
         self._generate_enhanced_plots()
@@ -524,21 +480,12 @@ class WatermarkTest:
         plt.figure(figsize=(10, 6))
         sns.scatterplot(
             data=self.results_df[self.results_df['watermarked_input']],
-            x='natural_language_score',
+            x='actual_vs_optimal_ratio',
             y='detected_watermark',
             hue='category'
         )
-        plt.title('Natural Language Score vs Detection Success')
+        plt.title('Actual vs Optimal Ratio vs Detection Success')
         plt.savefig(f"{output_dir}/natural_language_analysis.png")
-        
-        # Layer detection comparison
-        layer_data = self.results_df[self.results_df['watermarked_input']][
-            ['primary_layer_detection', 'secondary_layer_detection', 'verification_layer_detection']
-        ].melt()
-        plt.figure(figsize=(10, 6))
-        sns.boxplot(data=layer_data, x='variable', y='value')
-        plt.title('Detection Rates by Watermark Layer')
-        plt.savefig(f"{output_dir}/layer_detection_analysis.png")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run watermark detection tests')
