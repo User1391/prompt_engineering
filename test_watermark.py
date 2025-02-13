@@ -300,33 +300,27 @@ class WatermarkTest:
             ]
         }
         
-        # Run tests for each category with batching
+        # Calculate tests per topic to reach total num_tests
+        tests_per_topic = max(1, num_tests // (len(test_categories) * len(next(iter(test_categories.values())))))
+        
+        # Run tests for each category
         for category, topics in test_categories.items():
             print(f"\n=== Testing {category.title()} Content ===")
             
-            # Process in smaller batches
-            batch_size = 2  # Process 2 tests at a time
             for topic in topics:
-                for i in range(0, num_tests // len(topics), batch_size):
-                    print(f"Processing batch {i//batch_size + 1} for topic: {topic}")
+                print(f"Testing topic: {topic}")
+                for _ in range(tests_per_topic):
+                    # Run watermarked test
+                    result = self._run_single_test(topic, category, True)
+                    if result:
+                        results.append(result)
+                    time.sleep(1)  # Small delay between tests
                     
-                    # Run watermarked tests
-                    for j in range(batch_size):
-                        result = self._run_single_test(topic, category, True)
-                        if result:  # Only add if test was successful
-                            results.append(result)
-                    
-                    # Add a delay between batches
-                    time.sleep(2)
-                    
-                    # Run control tests
-                    for j in range(batch_size):
-                        result = self._run_single_test(topic, category, False)
-                        if result:
-                            results.append(result)
-                    
-                    # Add a delay between batches
-                    time.sleep(2)
+                    # Run control test
+                    result = self._run_single_test(topic, category, False)
+                    if result:
+                        results.append(result)
+                    time.sleep(1)  # Small delay between tests
         
         return results
 
@@ -567,10 +561,10 @@ class WatermarkTest:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run watermark detection tests')
-    parser.add_argument('--num-tests', type=int, default=5,
+    parser.add_argument('--num-tests', type=int, default=400,
                        help='Number of tests per configuration')
     parser.add_argument('--config', choices=['all', 'base', 'technical', 'critical', 'simple', 'complex'],
-                       default='base', help='Which configuration to test')
+                       default='all', help='Which configuration to test')
     args = parser.parse_args()
     
     tester = WatermarkTest()
@@ -586,5 +580,9 @@ if __name__ == "__main__":
             'simple': {'simplified_pattern': configs['simplified_pattern']},
             'complex': {'complex_pattern': configs['complex_pattern']}
         }
-        tester.run_comprehensive_tests(num_tests=args.num_tests, 
-                                     configurations=config_map[args.config]) 
+        selected_config = config_map.get(args.config)
+        if selected_config:
+            tester.run_comprehensive_tests(num_tests=args.num_tests, 
+                                         configurations=selected_config)
+        else:
+            print(f"Invalid configuration: {args.config}") 
