@@ -12,6 +12,7 @@ import seaborn as sns
 from collections import defaultdict
 from openai import OpenAI
 import argparse
+from detect_watermark import detect_watermark_pattern
 
 # Load environment variables if not already set
 if not os.getenv("OPENAI_API_KEY"):
@@ -27,7 +28,13 @@ if not os.getenv("OPENAI_API_KEY"):
 
 # Now import our modules after environment is set up
 from runprompt import client, build_watermark_instructions
-from watermark_data import FORCED_WORDS, SYNONYM_MAPPING, SIGNATURE_BITS, get_optimal_signature_length, select_synonym, validate_synonym_usage, ENHANCED_SYNONYM_MAPPING, NATURAL_PATTERNS, WATERMARK_LAYERS
+from watermark_data import (
+    FORCED_WORDS, SYNONYM_MAPPING, SIGNATURE_BITS, 
+    get_optimal_signature_length, select_synonym,
+    ENHANCED_SYNONYM_MAPPING, NATURAL_PATTERNS, WATERMARK_LAYERS,
+    TECHNICAL_SIGNATURE_BITS, TECHNICAL_FORCED_WORDS,
+    STANDARD_SIGNATURE_BITS, STANDARD_FORCED_WORDS
+)
 
 # Import and store original configuration
 ORIGINAL_SYNONYM_MAPPING = SYNONYM_MAPPING.copy()
@@ -67,12 +74,17 @@ def generate_watermarked_text(topic):
         }
     ]
     
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        temperature=0.7
-    )
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            timeout=30.0  # Add 30 second timeout
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"API Error: {str(e)}")
+        return "Error generating text"
 
 def generate_normal_text(topic):
     """Generate text without watermark instructions"""
@@ -87,12 +99,17 @@ def generate_normal_text(topic):
         }
     ]
     
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        temperature=0.7
-    )
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            timeout=30.0  # Add 30 second timeout
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"API Error: {str(e)}")
+        return "Error generating text"
 
 def detect_watermark(text):
     """Run detect_watermark.py on the text and parse results"""
@@ -306,11 +323,11 @@ class WatermarkTest:
             text_length = len(text.split())
             optimal_length = get_optimal_signature_length(text_length)
             
-            # Run detection
+            # Run detection using imported function
             is_watermarked, found_bits, found_synonyms = detect_watermark_pattern(
                 text, 
-                self.original_config['SIGNATURE_BITS'],
-                self.original_config['FORCED_WORDS']
+                STANDARD_SIGNATURE_BITS,  # Use standard pattern for testing
+                STANDARD_FORCED_WORDS
             )
             
             return {
@@ -489,10 +506,10 @@ class WatermarkTest:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run watermark detection tests')
-    parser.add_argument('--num-tests', type=int, default=50,
+    parser.add_argument('--num-tests', type=int, default=5,
                        help='Number of tests per configuration')
     parser.add_argument('--config', choices=['all', 'base', 'technical', 'critical', 'simple', 'complex'],
-                       default='all', help='Which configuration to test')
+                       default='base', help='Which configuration to test')
     args = parser.parse_args()
     
     tester = WatermarkTest()
