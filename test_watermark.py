@@ -505,22 +505,30 @@ class WatermarkTest:
         sns.barplot(
             data=self.results_df[self.results_df['watermarked_input']],
             x='configuration',
-            y='detected_watermark'
+            y='detected_watermark',
+            estimator=lambda x: (x.astype(int).mean() * 100)  # Convert to percentage
         )
         plt.xticks(rotation=45)
-        plt.title('Detection Success Rate by Configuration')
+        plt.title('Detection Success Rate by Configuration (%)')
+        plt.ylabel('Success Rate (%)')
         plt.tight_layout()
         plt.savefig(f"{output_dir}/configuration_comparison.png")
+        plt.close()
         
-        # Signature length vs detection success
+        # Text length vs detection success
         plt.figure(figsize=(10, 6))
-        sns.boxplot(
+        sns.scatterplot(
             data=self.results_df[self.results_df['watermarked_input']],
-            x='signature_length',
-            y='detected_watermark'
+            x='text_length',
+            y='detected_watermark',
+            hue='category'
         )
-        plt.title('Detection Success vs Signature Length')
-        plt.savefig(f"{output_dir}/signature_length_analysis.png")
+        plt.title('Detection Success vs Text Length')
+        plt.xlabel('Text Length (words)')
+        plt.ylabel('Detection Success')
+        plt.tight_layout()
+        plt.savefig(f"{output_dir}/text_length_analysis.png")
+        plt.close()
         
         # Natural language score vs detection success
         plt.figure(figsize=(10, 6))
@@ -530,8 +538,32 @@ class WatermarkTest:
             y='detected_watermark',
             hue='category'
         )
-        plt.title('Actual vs Optimal Ratio vs Detection Success')
+        plt.title('Detection Rate vs Actual/Optimal Ratio')
+        plt.xlabel('Actual/Optimal Ratio')
+        plt.ylabel('Detection Success')
+        plt.tight_layout()
         plt.savefig(f"{output_dir}/natural_language_analysis.png")
+        plt.close()
+        
+        # Category performance
+        plt.figure(figsize=(10, 6))
+        category_data = (self.results_df[self.results_df['watermarked_input']]
+                        .groupby('category')['detected_watermark']
+                        .agg(['mean', 'count'])
+                        .reset_index())
+        sns.barplot(
+            data=category_data,
+            x='category',
+            y='mean',
+            hue='count'
+        )
+        plt.title('Detection Success Rate by Category')
+        plt.xlabel('Category')
+        plt.ylabel('Success Rate')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.savefig(f"{output_dir}/category_performance.png")
+        plt.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run watermark detection tests')
