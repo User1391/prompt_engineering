@@ -1,0 +1,24 @@
+=== Watermark Detection Analysis ===
+
+Basic Statistics:
+total_tests: 4000
+watermarked_tests: 2000
+control_tests: 2000
+successful_detections: 1547
+false_positives: 0
+false_negatives: 453
+partial_detections: 437
+
+Detection Rates by Category:
+           detected_watermark  false_negative  partial_detection
+category                                                        
+critical                0.836           0.164              0.156
+emotional               0.610           0.390              0.386
+neutral                 0.754           0.246              0.226
+technical               0.894           0.106              0.106
+
+Statistical Tests:
+Chi-square test for category independence:
+chi2 = 129.96, p-value = 0.0000
+
+Success Rate: 77.35% ± 1.83% (95% CI)

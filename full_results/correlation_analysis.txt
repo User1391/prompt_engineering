@@ -1,0 +1,11 @@
+=== Correlation Analysis ===
+
+Correlations with Detection Success:
+detected_watermark          1.000000
+num_bits_found              0.839865
+text_length                -0.172837
+optimal_signature_length   -0.080513
+actual_vs_optimal_ratio     0.803880
+false_positive                   NaN
+false_negative             -1.000000
+partial_detection          -0.977141

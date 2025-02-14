@@ -1,0 +1,10 @@
+=== Configuration Performance Analysis ===
+
+                   detected_watermark       false_negative partial_detection num_synonyms signature_length
+                                 mean count           mean              mean        first            first
+configuration                                                                                             
+base_config                    0.7825   400         0.2175            0.2075            0                4
+complex_pattern                0.7475   400         0.2525            0.2400            0                7
+extended_critical              0.7675   400         0.2325            0.2225            0                5
+extended_technical             0.8150   400         0.1850            0.1775            0                6
+simplified_pattern             0.7550   400         0.2450            0.2450            0                3

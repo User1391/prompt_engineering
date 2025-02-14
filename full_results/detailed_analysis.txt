@@ -1,0 +1,29 @@
+=== Detailed Watermark Analysis ===
+
+Signature Length Analysis:
+                         detected_watermark       actual_vs_optimal_ratio
+                                       mean count                    mean
+optimal_signature_length                                                 
+3                                  0.038732  1704                0.054969
+4                                  0.645570  2291                0.770406
+5                                  0.400000     5                0.520000
+
+Detection Rate by Ratio Ranges:
+Could not compute ratio statistics: Length of grouper (4000) and axis (2000) must be same length
+
+Ratio Analysis:
+       actual_vs_optimal_ratio
+count              2000.000000
+mean                  0.929967
+std                   0.193140
+min                   0.000000
+max                   1.333333
+
+Category Performance:
+          detected_watermark        false_negative actual_vs_optimal_ratio
+                       count   mean           mean                    mean
+category                                                                  
+critical                 500  0.836          0.164                0.964167
+emotional                500  0.610          0.390                0.857800
+neutral                  500  0.754          0.246                0.911567
+technical                500  0.894          0.106                0.986333
